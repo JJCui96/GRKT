@@ -8,7 +8,7 @@ def training(argv = None):
 
 	print('Training start...')
 	parser = argparse.ArgumentParser(description = '')
-	parser.add_argument('--model', default = 'DKT', type = str, 
+	parser.add_argument('--model', default = 'GRKT', type = str, 
 		help = 'Model used.')
 	parser.add_argument('--dataset', default = 'assist09', type = str, 
 		help = 'Data used.')
