@@ -31,8 +31,6 @@ class BaseModel(nn.Module):
 			help = 'Batch size.')
 		parser.add_argument('--save_model', type = int, default = 0,
 			help = 'Save model or not.')
-		parser.add_argument('--multi_eval', type = int, default = 0,
-			help = 'Evaluate the model with more metircs.')
 		
 	
 	@staticmethod
@@ -67,11 +65,6 @@ class BaseModel(nn.Module):
 	
 	def evaluate(self, eval_paras, mode):
 		eval_funcs = {'AUC': AUC, 'ACC': ACC}
-
-		if mode == 'test' and self.args.multi_eval:
-			eval_funcs['CONSIST'] = CONSIST
-			eval_funcs['GAUC'] = GAUC
-			eval_funcs['REPEAT'] = REPEAT
 
 		eval_dict = dict()
 		for key in eval_funcs:
@@ -108,11 +101,6 @@ class BaseModel(nn.Module):
 			'ACC': ['scores', 'labels'], 
 		}
 
-		if mode == 'test' and self.args.multi_eval:
-			eval_paras_name['CONSIST'] = ['consist_scores']
-			eval_paras_name['GAUC'] = ['gauc_probs', 'gauc_scores', 'gauc_labels']
-			eval_paras_name['REPEAT'] = ['repeat_scores', 'repeat_labels']
-
 		eval_paras = dict()
 		for key in eval_paras_name:
 			for name in eval_paras_name[key]:
@@ -131,10 +119,6 @@ class BaseModel(nn.Module):
 				batch = data[i:i + self.args.batch_size]
 				feed_dict = self.get_feed_dict(batch, mode)
 				self.forward(feed_dict)
-				if mode == 'test' and self.args.multi_eval:
-					self.get_consist(feed_dict)
-					self.get_gauc(feed_dict)
-					self.get_repeat(feed_dict)
 
 				for name in eval_paras:
 					if name in feed_dict:
@@ -208,30 +192,3 @@ class BaseModel(nn.Module):
 		print('test:\t', performance_str(eval_dict))
 		return eval_dict
 	
-	def get_consist(self, feed_dict):
-
-		mastery_before, mastery_after = self.get_mastery(feed_dict)	# B, S-1, nk
-		delta = mastery_after - mastery_before						# B, S-1, nk
-		neg_delta = (delta <= 0).float()		# B, S-1, nk
-		corrs = feed_dict['corrs']				# B, S
-		corrs = corrs[:, 1:-1]					# B, S-2
-		probs = feed_dict['probs']				# B, S
-		probs = probs[:, 1:-1]					# B, S-2
-		prob_filt = probs > 0					# B, S-2
-		corr_filt = (corrs == False)			# B, S-2
-		filt = prob_filt & corr_filt			# B, S-2
-		feed_dict['consist_scores'] = neg_delta[filt]
-	
-	def get_gauc(self, feed_dict):
-
-		probs = feed_dict['probs']				# B, S
-		probs = probs[:, 1:]					# B, S-1
-		feed_dict['gauc_probs'] = probs[feed_dict['filt']]
-	
-	def get_repeat(self, feed_dict):
-
-		repeat_scores = self.get_repeat_score(feed_dict)	# B, S-1
-		corrs = feed_dict['corrs']	# B, S
-		labels = corrs[:, :-1]		# B, S-1
-		feed_dict['repeat_scores'] = repeat_scores[feed_dict['filt']]
-		feed_dict['repeat_labels'] = labels[feed_dict['filt']]
